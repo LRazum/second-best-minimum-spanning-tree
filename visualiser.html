@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="hr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MST + Binary Lifting — Vizualizator</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; }
+body {
+  font-family: 'IBM Plex Sans', sans-serif;
+  background: #f5f5f5;
+  color: #1a1a1a;
+  display: flex;
+  flex-direction: column;
+  font-size: 14px;
+}
+
+header {
+  flex-shrink: 0;
+  background: #fff;
+  border-bottom: 1px solid #d0d0d0;
+  padding: 0 20px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+header h1 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a1a1a;
+  white-space: nowrap;
+}
+.phase-bar {
+  display: flex;
+  align-items: center;
+}
+.ph {
+  padding: 4px 14px;
+  border: 1px solid #d0d0d0;
+  background: #f5f5f5;
+  color: #999;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  margin-left: -1px;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+.ph:first-child { border-radius: 3px 0 0 3px; }
+.ph:last-child  { border-radius: 0 3px 3px 0; }
+.ph.active { background: #1a1a1a; color: #fff; border-color: #1a1a1a; z-index: 1; }
+.ph.done   { background: #e8f5e9; color: #2e7d32; border-color: #a5d6a7; }
+
+.step-count {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+  color: #999;
+  white-space: nowrap;
+  min-width: 70px;
+  text-align: right;
+}
+
+main { flex: 1; display: flex; overflow: hidden; min-height: 0; }
+
+.canvas-panel {
+  flex: 1;
+  position: relative;
+  background: #fff;
+  border-right: 1px solid #d0d0d0;
+  overflow: hidden;
+}
+#canvas { display: block; width: 100%; height: 100%; cursor: crosshair; }
+.canvas-tip {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(255,255,255,0.93);
+  border: 1px solid #d0d0d0;
+  color: #777;
+  font-size: 11px;
+  padding: 5px 14px;
+  border-radius: 3px;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.info-panel {
+  width: 430px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #fff;
+}
+
+.status-area {
+  padding: 14px 16px;
+  border-bottom: 1px solid #e8e8e8;
+  flex-shrink: 0;
+}
+.area-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #999;
+  margin-bottom: 7px;
+}
+.status-msg {
+  font-size: 12.5px;
+  line-height: 1.75;
+  color: #1a1a1a;
+  background: #fafafa;
+  border: 1px solid #e8e8e8;
+  border-left: 3px solid #bbb;
+  padding: 10px 13px;
+  border-radius: 0 3px 3px 0;
+  white-space: pre-wrap;
+  min-height: 130px;
+  transition: border-left-color 0.25s;
+}
+.status-msg.kruskal { border-left-color: #2e7d32; }
+.status-msg.dfs     { border-left-color: #1565c0; }
+.status-msg.lifting { border-left-color: #e65100; }
+.status-msg.query   { border-left-color: #6a1b9a; }
+.status-msg.error   { border-left-color: #c62828; background: #fff8f8; }
+
+.progress { height: 2px; background: #e8e8e8; flex-shrink: 0; }
+.progress-fill {
+  height: 100%;
+  width: 0%;
+  background: #555;
+  transition: width 0.35s ease;
+}
+
+.legend {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 9px 16px;
+  border-bottom: 1px solid #e8e8e8;
+  flex-shrink: 0;
+  background: #fafafa;
+}
+.leg { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #555; }
+.leg-line { width: 20px; height: 3px; border-radius: 1px; }
+.leg-circle {
+  width: 13px; height: 13px; border-radius: 50%;
+  border: 2px solid; background: #fff;
+}
+
+.table-section {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 14px;
+  min-height: 0;
+}
+.table-section::-webkit-scrollbar { width: 5px; }
+.table-section::-webkit-scrollbar-track { background: #f5f5f5; }
+.table-section::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
+
+#tbl-wrap table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  font-family: 'IBM Plex Mono', monospace;
+}
+#tbl-wrap th {
+  background: #f0f0f0;
+  color: #333;
+  font-weight: 600;
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 11px;
+  padding: 7px 8px;
+  text-align: center;
+  border: 1px solid #d8d8d8;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+#tbl-wrap td {
+  border: 1px solid #e8e8e8;
+  padding: 6px 8px;
+  text-align: center;
+  color: #555;
+  font-variant-numeric: tabular-nums;
+  transition: background 0.2s;
+}
+.td-nid {
+  background: #f0f0f0 !important;
+  color: #1a1a1a !important;
+  font-weight: 600;
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 11px;
+}
+.td-active {
+  background: #fff9c4 !important;
+  color: #4e342e !important;
+  font-weight: 600;
+}
+.td-filled { color: #2e7d32; }
+.td-empty  { color: #ccc; }
+
+.controls {
+  padding: 11px 14px;
+  display: flex;
+  gap: 7px;
+  flex-shrink: 0;
+  border-top: 1px solid #d8d8d8;
+  background: #fafafa;
+}
+.btn {
+  flex: 1;
+  padding: 9px 6px;
+  border-radius: 3px;
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid;
+  transition: background 0.15s;
+  letter-spacing: 0.02em;
+}
+.btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.btn-run {
+  background: #1a1a1a; color: #fff; border-color: #1a1a1a;
+}
+.btn-run:not(:disabled):hover { background: #333; }
+.btn-nav {
+  background: #fff; color: #333; border-color: #ccc;
+}
+.btn-nav:not(:disabled):hover { background: #f0f0f0; }
+.btn-prev { flex: 0.7; }
+.btn-reset {
+  flex: 0.45;
+  background: #fff; color: #999; border-color: #d8d8d8; font-size: 15px;
+}
+.btn-reset:hover { color: #c62828; border-color: #e57373; background: #fff8f8; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Vizualizator: Minimalno Razapinjuće Stablo + Binary Lifting</h1>
+  <div class="phase-bar">
+    <div class="ph" id="ph0">1. Kruskal</div>
+    <div class="ph" id="ph1">2. DFS</div>
+    <div class="ph" id="ph2">3. Binary Lifting</div>
+    <div class="ph" id="ph3">4. LCA Upit</div>
+  </div>
+  <div class="step-count" id="stepCount">— / —</div>
+</header>
+
+<main>
+  <div class="canvas-panel">
+    <canvas id="canvas"></canvas>
+    <div class="canvas-tip" id="canvasTip">
+      Klik na prazno → novi čvor &nbsp;·&nbsp; Klik na čvor → odaberi &nbsp;·&nbsp; Klik na drugi čvor → poveži bridom
+    </div>
+  </div>
+
+  <div class="info-panel">
+    <div class="status-area">
+      <div class="area-label">Trenutni korak</div>
+      <div class="status-msg" id="statusMsg">Dobrodošao u vizualizator.
+
+Nacrtaj graf mišem na lijevoj strani:
+  · Klik na prazno  →  dodaje novi čvor
+  · Klik na čvor    →  odaberi ga
+  · Klik na drugi   →  poveži ih bridom (nasumična težina)
+
+Preporučeno: 5–8 čvorova s barem jednim ciklusom.</div>
+    </div>
+
+    <div class="progress"><div class="progress-fill" id="progFill"></div></div>
+
+    <div class="legend">
+      <div class="leg"><div class="leg-line" style="background:#2e7d32"></div>MST brid</div>
+      <div class="leg"><div class="leg-line" style="background:#e53935;"></div>Odbačen / Za brisanje</div>
+      <div class="leg"><div class="leg-line" style="background:#e65100;height:4px"></div>Novi brid (Upit)</div>
+      <div class="leg"><div class="leg-circle" style="border-color:#e65100"></div>Aktivan čvor</div>
+    </div>
+
+    <div class="table-section">
+      <div class="area-label" style="margin-bottom:8px">Tablice up[ ] i mx[ ]</div>
+      <div id="tbl-wrap">
+        <p style="color:#bbb;font-size:12px">Prikazat će se nakon pokretanja algoritma.</p>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button class="btn btn-nav btn-prev" id="btnPrev" disabled>← Natrag</button>
+      <button class="btn btn-run"          id="btnRun"          >▶ Pokreni algoritam</button>
+      <button class="btn btn-nav"          id="btnNext" disabled>Dalje →</button>
+      <button class="btn btn-reset"        id="btnReset"        >↺</button>
+    </div>
+  </div>
+</main>
+
+<script>
+// ─── STATE ───────────────────────────────────────────────────────
+let nodes = [], edges = [], selectedNode = null, mode = 'build';
+let steps = [], stepIdx = -1;
+
+// ─── CANVAS ──────────────────────────────────────────────────────
+const cvs = document.getElementById('canvas');
+const ctx = cvs.getContext('2d');
+const NR  = 20;
+
+function resize() {
+  cvs.width  = cvs.parentElement.clientWidth;
+  cvs.height = cvs.parentElement.clientHeight;
+  render();
+}
+window.addEventListener('resize', resize);
+resize();
+
+// ─── RENDER ──────────────────────────────────────────────────────
+function render(state = null) {
+  ctx.clearRect(0, 0, cvs.width, cvs.height);
+
+  const mstIds = state?.mstIds   || new Set();
+  const hlId   = state?.hlId     ?? null;
+  const rejId  = state?.rejId    ?? null;
+  const actN   = state?.actNodes || new Set();
+
+  // edges
+  for (const e of edges) {
+    const u = nodes.find(n => n.id === e.u);
+    const v = nodes.find(n => n.id === e.v);
+    if (!u || !v) continue;
+
+    let color, lw, dash;
+    if      (e.id === rejId)   { color = '#e53935'; lw = 4;   dash = [6,4]; }
+    else if (e.id === hlId)    { color = '#e65100'; lw = 4;   dash = [];    }
+    else if (mstIds.has(e.id)) { color = '#2e7d32'; lw = 2.5; dash = [];    }
+    else                       { color = '#c8c8c8'; lw = 1.5; dash = [];    }
+
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.lineWidth   = lw;
+    ctx.setLineDash(dash);
+    ctx.beginPath();
+    ctx.moveTo(u.x, u.y);
+    ctx.lineTo(v.x, v.y);
+    ctx.stroke();
+    ctx.restore();
+
+    // weight label
+    const mx = (u.x + v.x) / 2, my = (u.y + v.y) / 2;
+    const lc = mstIds.has(e.id) ? '#2e7d32'
+             : e.id === hlId    ? '#e65100'
+             : e.id === rejId   ? '#e53935'
+             : '#888';
+    ctx.save();
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(mx, my, 10, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = '#ddd'; ctx.lineWidth = 1; ctx.stroke();
+    ctx.fillStyle   = lc;
+    ctx.font        = 'bold 11px IBM Plex Mono, monospace';
+    ctx.textAlign   = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(e.weight, mx, my);
+    ctx.restore();
+  }
+
+  // nodes
+  for (const node of nodes) {
+    const isSel = node === selectedNode;
+    const isAct = actN.has(node.id);
+
+    let fill, stroke, text;
+    if      (isSel) { fill = '#fff8e1'; stroke = '#f9a825'; text = '#5d4037'; }
+    else if (isAct) { fill = '#fff3e0'; stroke = '#e65100'; text = '#e65100'; }
+    else            { fill = '#fff';    stroke = '#555';    text = '#1a1a1a'; }
+
+    ctx.save();
+    ctx.beginPath(); ctx.arc(node.x, node.y, NR, 0, Math.PI*2);
+    ctx.fillStyle   = fill;   ctx.fill();
+    ctx.strokeStyle = stroke; ctx.lineWidth = isSel || isAct ? 2 : 1.5;
+    ctx.stroke();
+    ctx.fillStyle    = text;
+    ctx.font         = 'bold 13px IBM Plex Sans, sans-serif';
+    ctx.textAlign    = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(node.id, node.x, node.y);
+    ctx.restore();
+  }
+}
+
+// ─── INTERACTION ─────────────────────────────────────────────────
+function nodeAt(x, y) {
+  return nodes.find(n => Math.hypot(n.x - x, n.y - y) < NR + 6) || null;
+}
+
+cvs.addEventListener('click', e => {
+  if (mode !== 'build') return;
+  const r = cvs.getBoundingClientRect();
+  const x = (e.clientX - r.left) * (cvs.width  / r.width);
+  const y = (e.clientY - r.top)  * (cvs.height / r.height);
+  const hit = nodeAt(x, y);
+
+  if (!hit) {
+    nodes.push({ id: nodes.length + 1, x, y });
+    selectedNode = null;
+  } else if (!selectedNode) {
+    selectedNode = hit;
+  } else if (selectedNode === hit) {
+    selectedNode = null;
+  } else {
+    const a = selectedNode, b = hit;
+    if (!edges.some(e => (e.u===a.id&&e.v===b.id)||(e.u===b.id&&e.v===a.id))) {
+      edges.push({ u: a.id, v: b.id, weight: Math.floor(Math.random()*20)+1, id: edges.length });
+    }
+    selectedNode = null;
+  }
+  render();
+});
+
+cvs.addEventListener('mousemove', e => {
+  if (mode !== 'build') return;
+  const r = cvs.getBoundingClientRect();
+  const x = (e.clientX - r.left) * (cvs.width  / r.width);
+  const y = (e.clientY - r.top)  * (cvs.height / r.height);
+  cvs.style.cursor = nodeAt(x, y) ? 'pointer' : 'crosshair';
+});
+
+// ─── ALGORITHM ───────────────────────────────────────────────────
+function computeSteps() {
+  const n   = nodes.length;
+  const LOG = Math.floor(Math.log2(n)) + 2;
+  const all = [];
+
+  const up = Array.from({ length: n+1 }, () => Array(LOG).fill(-1));
+  const mx = Array.from({ length: n+1 }, () => Array(LOG).fill(0));
+  const h  = Array(n+1).fill(0);
+
+  function snap() { return { up: up.map(r=>[...r]), mx: mx.map(r=>[...r]) }; }
+
+  function push(msg, phase, mstIds, hlId, rejId, actNodes, cell) {
+    const s = snap();
+    all.push({ message: msg, phase,
+      mstIds: new Set(mstIds), hlId: hlId??null, rejId: rejId??null,
+      actNodes: new Set(actNodes||[]),
+      upT: s.up, mxT: s.mx, cell: cell||null
+    });
+  }
+
+  // 1. KRUSKAL
+  push(
+    `Faza 1 — Kruskalov algoritam\n\nTražimo glavno Minimalno razapinjuće stablo (MST) za cijeli graf. Sortiramo sve bridove po težini.\n\nZa svaki brid koji uđe u ovo stablo, rješenje zadatka bit će jednostavno ukupna težina cijelog MST-a.`,
+    'kruskal', [], null, null, [], null
+  );
+
+  const par = Array.from({ length: n+1 }, (_, i) => i);
+  const sz  = Array(n+1).fill(1);
+  function find(v) { if (par[v] !== v) par[v] = find(par[v]); return par[v]; }
+  function unite(a, b) {
+    a = find(a); b = find(b);
+    if (a === b) return false;
+    if (sz[a] < sz[b]) [a,b] = [b,a];
+    par[b] = a; sz[a] += sz[b]; return true;
+  }
+
+  const sorted = [...edges].sort((a,b) => a.weight - b.weight);
+  const mstIds = new Set();
+  const adj    = Array.from({ length: n+1 }, () => []);
+
+  for (const e of sorted) {
+    if (unite(e.u, e.v)) {
+      mstIds.add(e.id);
+      adj[e.u].push({ v: e.v, w: e.weight });
+      adj[e.v].push({ v: e.u, w: e.weight });
+      push(
+        `Dodajemo brid (${e.u}, ${e.v}) težine ${e.weight} u glavni MST.\n\nČvorovi su bili u različitim komponentama, stoga ne nastaje ciklus.`,
+        'kruskal', mstIds, e.id, null, [e.u, e.v], null
+      );
+    } else {
+      push(
+        `Odbacujemo brid (${e.u}, ${e.v}) težine ${e.weight}.\n\nČvorovi ${e.u} i ${e.v} već su spojeni u stablu. Dodavanje ovog brida stvorilo bi ciklus.`,
+        'kruskal', mstIds, null, e.id, [e.u, e.v], null
+      );
+    }
+  }
+
+  if (mstIds.size < n - 1) {
+    push('Greška: graf nije povezan.\nAlgoritam ne može pronaći razapinjuće stablo jer komponente nisu spojene.', 'kruskal', mstIds, null, null, [], null);
+    return all;
+  }
+
+  const mstW = [...mstIds].reduce((s,id) => s + (edges.find(e=>e.id===id)?.weight||0), 0);
+  push(
+    `Kruskal završen.\nUkupna težina glavnog MST-a iznosi ${mstW}.\n\nVažno: Za sve bridove koji su ušli u ovo zeleno stablo, konačno rješenje zadatka bit će točno ${mstW}!`,
+    'kruskal', mstIds, null, null, [], null
+  );
+
+  // 2. DFS
+  push(
+    `Faza 2 — Priprema za upite (DFS)\n\nPokrećemo DFS kako bismo zabilježili dubinu svakog čvora, njegovog prvog pretka (up[u][0]) te težinu brida do njega (mx[u][0]).\n\nOvo je baza za brzo pronalaženje ciklusa i najtežeg brida u njemu.`,
+    'dfs', mstIds, null, null, [1], null
+  );
+
+  function dfs(u, p, w) {
+    up[u][0] = p; mx[u][0] = w;
+    push(
+      `DFS bilježi podatke za čvor ${u} (dubina ${h[u]}):\n\n  1. predak (up) je ${p === -1 ? 'Nitko (korijen)' : p}\n  Težina do njega (mx) je ${p === -1 ? '0' : w}`,
+      'dfs', mstIds, null, null, [u], { node: u, jump: 0 }
+    );
+    for (const { v, w: ww } of adj[u]) {
+      if (v !== p) { h[v] = h[u] + 1; dfs(v, u, ww); }
+    }
+  }
+  h[1] = 0; dfs(1, -1, 0);
+
+  // 3. BINARY LIFTING
+  push(
+    `Faza 3 — Popunjavanje tablice prečaca (Binary Lifting)\n\nDa bismo iznimno brzo (u logaritamskom vremenu) našli najteži brid u ciklusu, računamo tko je 2^i-ti predak i koji je najteži brid na tom dugačkom putu.\n\nAžurira se tablica.`,
+    'lifting', mstIds, null, null, [], null
+  );
+
+  for (let i = 1; i < LOG; i++) {
+    for (let j = 1; j <= n; j++) {
+      const half = up[j][i-1];
+      if (half === -1) continue;
+      up[j][i] = up[half][i-1];
+      mx[j][i] = Math.max(mx[j][i-1], mx[half][i-1]);
+      if (up[j][i] !== -1) {
+        push(
+          `Računamo prečac za čvor ${j} (skok za 2^${i} = ${1<<i} koraka):\n\nTaj skok vodi u čvor ${up[j][i]}.\nNajteži brid na cijelom tom putu iznosi: ${mx[j][i]}.`,
+          'lifting', mstIds, null, null, [j, up[j][i]], { node: j, jump: i }
+        );
+      }
+    }
+  }
+
+  // 4. LCA
+  let qEdge = null;
+  for (let k = edges.length - 1; k >= 0; k--) {
+    if (!mstIds.has(edges[k].id)) { qEdge = edges[k]; break; }
+  }
+
+  if (!qEdge) {
+    push('Nema bridova izvan glavnog MST-a.\nSvi bridovi su već u stablu, rješenje za svaki brid iznosi ' + mstW + '.', 'query', mstIds, null, null, [], null);
+    return all;
+  }
+
+  const { u: qu, v: qv, weight: qw } = qEdge;
+  push(
+    `Faza 4 — Rješavanje problema za brid izvan MST-a\n\nOdabrali smo brid (${qu}, ${qv}) težine ${qw}.\nNjegovim na silu ubacivanjem u graf nastaje krug (ciklus).\n\nDa bismo popravili stablo, iz tog kruga moramo izbaciti najteži postojeći zeleni brid!`,
+    'query', mstIds, qEdge.id, null, [qu, qv], null
+  );
+
+  let res = 0, cu = qu, cv = qv;
+  if (h[cu] < h[cv]) [cu, cv] = [cv, cu];
+
+  for (let i = LOG-1; i >= 0; i--) {
+    if (h[cu] - (1<<i) >= h[cv] && up[cu][i] !== -1) {
+      const old = cu;
+      res = Math.max(res, mx[cu][i]);
+      cu  = up[cu][i];
+      push(
+        `Izjednačavanje dubine čvorova:\n\nDižemo dublji čvor ${old} za 2^${i} = ${1<<i} koraka gore prema zajedničkom pretku. Stigli smo u čvor ${cu}.\n\nNajteži skenirani stari brid na ovom putu iznosi: ${res}.`,
+        'query', mstIds, qEdge.id, null, [cu, cv], { node: old, jump: i }
+      );
+    }
+  }
+
+  if (cu !== cv) {
+    for (let i = LOG-1; i >= 0; i--) {
+      if (up[cu][i] !== -1 && up[cu][i] !== up[cv][i]) {
+        const ou = cu, ov = cv;
+        res = Math.max(res, mx[cu][i], mx[cv][i]);
+        cu  = up[cu][i]; cv = up[cv][i];
+        push(
+          `Skakanje zajedno prema LCA:\n\nDižemo oba čvora paralelno za 2^${i} = ${1<<i} koraka (čvorovi ${cu} i ${cv}).\n\nNajteži skenirani stari brid u obje grane dosad iznosi: ${res}.`,
+          'query', mstIds, qEdge.id, null, [cu, cv], { node: ou, jump: i }
+        );
+      }
+    }
+    res = Math.max(res, mx[cu][0], mx[cv][0]);
+    cu  = up[cu][0];
+  }
+
+  const lca = cu;
+  
+  // Pronalaženje ID-a najtežeg brida (samo za vizualizaciju crvene boje na grafu)
+  let maxEdgeId = null;
+  for (const id of mstIds) {
+      const e = edges.find(ed => ed.id === id);
+      if (e.weight === res) { maxEdgeId = e.id; break; }
+  }
+
+  push(
+    `KONAČNO RJEŠENJE ZA BRID (${qu}, ${qv})\n\nPronađen zajednički predak u ciklusu: čvor ${lca}.\nNajteži stari brid u ciklusu ima težinu: ${res}. Izbacujemo njega, a ostavljamo novi brid.\n\nKonačna najmanja moguća težina razapinjućeg stabla koje sadrži brid (${qu},${qv}) je:\nUkupni MST (${mstW}) + Novi brid (${qw}) - Stari brid (${res})  =  ${mstW + qw - res}.`,
+    'query', mstIds, qEdge.id, maxEdgeId, [lca], null
+  );
+
+  return all;
+}
+
+// ─── TABLE RENDER ─────────────────────────────────────────────────
+function renderTable(step) {
+  const c = document.getElementById('tbl-wrap');
+  if (!step?.upT) { c.innerHTML = ''; return; }
+  const n    = nodes.length;
+  const cols = Math.min(step.upT[0]?.length || 0, 5);
+
+  let html = `<table><thead><tr><th>Čvor</th>`;
+  for (let i = 0; i < cols; i++)
+    html += `<th>Skok 2<sup>${i}</sup> = ${1<<i}<br><span style="font-weight:400;opacity:.65;font-size:10px">up &nbsp;|&nbsp; mx</span></th>`;
+  html += `</tr></thead><tbody>`;
+
+  for (let j = 1; j <= n; j++) {
+    html += `<tr><td class="td-nid">${j}</td>`;
+    for (let i = 0; i < cols; i++) {
+      const uv = step.upT[j]?.[i], mv = step.mxT[j]?.[i];
+      const isAct   = step.cell?.node === j && step.cell?.jump === i;
+      const isFilled = uv !== undefined && uv !== -1;
+      const cls = isAct ? 'td-active' : isFilled ? 'td-filled' : 'td-empty';
+      const ud  = (uv === -1 || uv === undefined) ? '—' : uv;
+      const md  = (uv === -1 || uv === undefined) ? '—' : mv;
+      html += `<td class="${cls}">${ud} &nbsp;|&nbsp; ${md}</td>`;
+    }
+    html += `</tr>`;
+  }
+  html += `</tbody></table>`;
+  c.innerHTML = html;
+  c.querySelector('.td-active')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+
+// ─── PHASE DOTS ───────────────────────────────────────────────────
+const PHASES = ['kruskal', 'dfs', 'lifting', 'query'];
+function setPhase(phase) {
+  const idx = PHASES.indexOf(phase);
+  PHASES.forEach((_, i) => {
+    const el = document.getElementById(`ph${i}`);
+    el.classList.remove('active', 'done');
+    if (i < idx)   el.classList.add('done');
+    if (i === idx) el.classList.add('active');
+  });
+}
+
+// ─── APPLY STEP ───────────────────────────────────────────────────
+function applyStep(idx) {
+  if (idx < 0 || idx >= steps.length) return;
+  stepIdx = idx;
+  const s = steps[idx];
+
+  const msg = document.getElementById('statusMsg');
+  msg.textContent = s.message;
+  msg.className   = `status-msg ${s.phase}`;
+
+  document.getElementById('progFill').style.width  = ((idx+1) / steps.length * 100) + '%';
+  document.getElementById('stepCount').textContent = `${idx+1} / ${steps.length}`;
+
+  setPhase(s.phase);
+  renderTable(s);
+  render(s);
+
+  document.getElementById('btnPrev').disabled = idx === 0;
+  document.getElementById('btnNext').disabled = idx === steps.length - 1;
+}
+
+// ─── BUTTONS ──────────────────────────────────────────────────────
+document.getElementById('btnRun').addEventListener('click', () => {
+  if (nodes.length < 2 || edges.length === 0) {
+    const m = document.getElementById('statusMsg');
+    m.textContent = 'Graf je prazan.\n\nDodaj barem 3 čvorova i poveži ih bridovima.';
+    m.className   = 'status-msg error';
+    return;
+  }
+  mode = 'run';
+  cvs.style.cursor = 'default';
+  document.getElementById('canvasTip').style.display = 'none';
+  document.getElementById('btnRun').style.display    = 'none';
+  document.getElementById('btnNext').disabled = false;
+  steps = computeSteps();
+  applyStep(0);
+});
+
+document.getElementById('btnNext').addEventListener('click', () => {
+  if (stepIdx < steps.length - 1) applyStep(stepIdx + 1);
+});
+document.getElementById('btnPrev').addEventListener('click', () => {
+  if (stepIdx > 0) applyStep(stepIdx - 1);
+});
+document.getElementById('btnReset').addEventListener('click', () => {
+  nodes = []; edges = []; selectedNode = null; mode = 'build';
+  steps = []; stepIdx = -1;
+  document.getElementById('statusMsg').textContent =
+    'Graf resetiran.\n\nNacrtaj novi graf mišem na lijevoj strani.';
+  document.getElementById('statusMsg').className = 'status-msg';
+  document.getElementById('tbl-wrap').innerHTML  =
+    '<p style="color:#bbb;font-size:12px">Prikazat će se nakon pokretanja algoritma.</p>';
+  document.getElementById('progFill').style.width    = '0%';
+  document.getElementById('stepCount').textContent   = '— / —';
+  document.getElementById('canvasTip').style.display = '';
+  document.getElementById('btnRun').style.display    = '';
+  document.getElementById('btnNext').disabled = true;
+  document.getElementById('btnPrev').disabled = true;
+  PHASES.forEach((_, i) => {
+    document.getElementById(`ph${i}`).classList.remove('active', 'done');
+  });
+  cvs.style.cursor = 'crosshair';
+  render();
+});
+
+document.addEventListener('keydown', e => {
+  if (mode !== 'run') return;
+  if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); if (stepIdx < steps.length-1) applyStep(stepIdx+1); }
+  if (e.key === 'ArrowLeft')                   { e.preventDefault(); if (stepIdx > 0)               applyStep(stepIdx-1); }
+});
+
+render();
+</script>
+</body>
+</html>
