@@ -91,8 +91,8 @@ long long get_max_edge(int u, int v)
         return res;
     
     // 2. Skakanje paralelno prema gore
-    for (int i = LOG - 1; i >= 0; i--) {
-        if (up[u][i] != -1 && up[u][i] != up[v][i]) {
+    for(int i = LOG - 1; i >= 0; i--){
+        if(up[u][i] != -1 && up[u][i] != up[v][i]){
             res = max(res, mx_edge[u][i]);
             res = max(res, mx_edge[v][i]);
             u = up[u][i];
