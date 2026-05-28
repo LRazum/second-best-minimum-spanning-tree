@@ -135,7 +135,7 @@ int main(void){
 
     long long mst_weight = 0;
 
-    // 1. KORAK: Gradimo glavno Minimalno razapinjuće stablo
+    // Gradimo glavno Minimalno razapinjuće stablo
     for(Edge e : sorted_edges){
         if(unite_set(e.u, e.v)){
             in_mst[e.id] = true;
@@ -147,7 +147,7 @@ int main(void){
         }
     }
 
-    // 2. KORAK: Priprema za Binary Lifting
+    // Priprema za Binary Lifting
     h[1] = 0;
     dfs(1, -1, 0); // Korijen je 1, nema roditelja (-1), težina do roditelja je 0
 
@@ -162,7 +162,7 @@ int main(void){
         }
     }
 
-    // 3. KORAK: Računanje rješenja za svaki pojedini brid
+    // Računanje rješenja za svaki pojedini brid
     for(Edge e : edges){
         if(in_mst[e.id]){
             // Ako je brid već u MST-u, rješenje je jednostavno ukupna težina MST-a
@@ -177,7 +177,7 @@ int main(void){
         }
     }
 
-    // 4. KORAK: Ispis rješenja
+    // Ispis rješenja
     for(int i=0; i<m; ++i){
         cout << ans[i] << "\n";
     }
